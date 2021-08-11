@@ -81,7 +81,7 @@ class IDCODEReg(Module):
 class HelloReg(Module):
     def __init__(self, tdi: Signal, tdo: Signal, hellocode: Constant, tap_fsm: JTAGTAPFSM):
         self.dr = dr = Signal(32, reset=hellocode.value)
-        self.dr_tmp = dr_tmp = Signal(1, reset=hellocode.value[0])
+        self.dr_tmp = dr_tmp = Signal(1, reset=hellocode.value & 1)
         self.comb += tdo.eq(dr_tmp)
         self.sync.jtag_inv += dr_tmp.eq(dr[0])
 
