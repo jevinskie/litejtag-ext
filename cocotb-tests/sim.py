@@ -214,11 +214,29 @@ sigs = None
 soc = None
 ns = None
 
-def nol(sig: Signal) -> str:
-    return sig.name_override
 
-def nsl(sig: Signal) -> str:
-    return ns.pnd[sig]
+
+def get_sig_dict(t, j, jf):
+    def helper(platform, soc, ns):
+        def nol(sig: Signal) -> str:
+            return sig.name_override
+
+        def nsl(sig: Signal) -> str:
+            return ns.pnd[sig]
+
+        return {
+            'clk': getattr(t, nol(soc.crg.cd_sys.clk)),
+            'rst': getattr(t, nol(soc.crg.cd_sys.rst)),
+            'tck': getattr(t, nsl(j.tck)),
+            'tms': getattr(t, nsl(j.tms)),
+            'tdi': getattr(t, nsl(j.tdi)),
+            'tdo': getattr(t, nsl(j.tdo)),
+            'trst': getattr(t, nsl(j.trst)),
+            'TLR': getattr(t, nsl(jf.TEST_LOGIC_RESET)),
+        }
+
+    return srv.root.call_on_server(helper)
+
 
 if cocotb.top is not None:
     soc = srv.root.soc
@@ -227,18 +245,9 @@ if cocotb.top is not None:
     t = cocotb.top
     jf = soc.jev_tap.state_fsm
 
-    d = {}
-    # FIXME: why doesnt nsl work for CRG signals?
-    d['clk']  = getattr(t, nol(soc.crg.cd_sys.clk))
-    d['rst']  = getattr(t, nol(soc.crg.cd_sys.rst))
-    d['tck']  = getattr(t, nsl(j.tck))
-    d['tms']  = getattr(t, nsl(j.tms))
-    d['tdi']  = getattr(t, nsl(j.tdi))
-    d['tdo']  = getattr(t, nsl(j.tdo))
-    d['trst'] = getattr(t, nsl(j.trst))
-    d['TLR']  = getattr(t, nsl(jf.TEST_LOGIC_RESET))
-
+    d = get_sig_dict(cocotb.top, j, jf)
     sigs = Sigs(**d)
+
 
 def xbits(n, hi, lo):
     return (n >> lo) & (2**(hi+1 - lo) - 1)
@@ -334,7 +343,7 @@ class SimJtagController(JtagController):
         raise NotImplementedError
 
 
-@cocotb.test()
+@cocotb.test(skip=True)
 async def reset_tap(dut):
     fork_clk()
     sigs.tck <= 0
@@ -352,7 +361,7 @@ async def reset_tap(dut):
     await tclk
     print(f'at end of reset tck: {sigs.tck.value}')
 
-@cocotb.test(skip=False)
+@cocotb.test(skip=True)
 async def openocd_srv(dut):
     fork_clk()
     p = dut._log.info
@@ -360,6 +369,7 @@ async def openocd_srv(dut):
     await tmr(2*clkper_ns)
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('localhost', 2430))
     s.listen(1)
     conn, addr = s.accept()
@@ -438,7 +448,7 @@ async def read_idcode(dut):
 
 
 
-@cocotb.test(skip=False)
+@cocotb.test(skip=True)
 async def reset_to_e1d(dut):
     fork_clk()
     dut._log.info("Running reset_to_e1d...")
