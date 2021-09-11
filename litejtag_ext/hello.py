@@ -101,6 +101,7 @@ class JTAGHello(Module):
             ),
         ]
 
-        self.sync.jtag_inv += hello_inner_tdo.eq(hello_dr[0])
+        self.comb += hello_inner_tdo.eq(hello_dr[0])
+        # self.sync.jtag_inv += hello_inner_tdo.eq(hello_dr[0])
 
         # # #
